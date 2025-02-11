@@ -1,0 +1,213 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Settings {
+  id                Int      @id @default(1)
+  googleClientId    String?
+  googleClientSecret String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+  USER
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ReportType {
+  SEO
+  BACKLINK
+  TECHNICAL_SEO
+  SITE_ERRORS
+  CORE_WEB_VITALS
+  CUSTOM
+}
+
+enum ReportFormat {
+  PDF
+  SHEETS
+  HTML
+}
+
+enum ReportFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum ReportStatus {
+  SUCCESS
+  FAILED
+  RUNNING
+  PENDING
+}
+
+enum ProposalStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  name          String?
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdBy     Int?
+  status        Boolean   @default(true)
+  domains       Domain[]  @relation("UserDomains")
+  apiKeys       ApiKey[]
+  customers     Customer[]
+  proposals     Proposal[]
+  reports       Report[]
+}
+
+model Domain {
+  id            Int       @id @default(autoincrement())
+  url           String    @unique
+  name          String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  users         User[]    @relation("UserDomains")
+  analytics     Analytics[]
+  seoReports    SeoReport[]
+  alerts        Alert[]
+  status        Boolean   @default(true)
+}
+
+model Customer {
+  id            Int       @id @default(autoincrement())
+  name          String
+  company       String?
+  email         String?
+  phone         String?
+  address       String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id])
+  proposals     Proposal[]
+  status        Boolean   @default(true)
+}
+
+model Proposal {
+  id            Int       @id @default(autoincrement())
+  title         String
+  content       String
+  totalAmount   Float
+  currency      String    @default("TRY")
+  validUntil    DateTime?
+  status        ProposalStatus @default(DRAFT)
+  customerId    Int
+  customer      Customer  @relation(fields: [customerId], references: [id])
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  items         ProposalItem[]
+}
+
+model ProposalItem {
+  id            Int       @id @default(autoincrement())
+  description   String
+  quantity      Int       @default(1)
+  unitPrice     Float
+  totalPrice    Float
+  proposalId    Int
+  proposal      Proposal  @relation(fields: [proposalId], references: [id])
+}
+
+model ApiKey {
+  id            Int       @id @default(autoincrement())
+  name          String    // Project ID için
+  provider      String    // "google-search-console", "google-analytics", "google-sheets"
+  clientId      String    // API Key
+  clientSecret  String    // Client Email
+  privateKey    String?   // Private Key
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, provider])
+}
+
+model Analytics {
+  id                Int       @id @default(autoincrement())
+  date              DateTime
+  pageViews         Int       @default(0)
+  uniqueVisitors    Int       @default(0)
+  bounceRate        Float?
+  avgSessionDuration Float?
+  domainId          Int
+  domain            Domain    @relation(fields: [domainId], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([date, domainId])
+}
+
+model SeoReport {
+  id            Int       @id @default(autoincrement())
+  type          ReportType
+  data          String    // JSON data
+  score         Int?      @default(0)
+  domainId      Int
+  domain        Domain    @relation(fields: [domainId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Report {
+  id            Int       @id @default(autoincrement())
+  name          String
+  type          ReportType
+  format        ReportFormat
+  frequency     ReportFrequency
+  lastRun       DateTime?
+  nextRun       DateTime?
+  status        ReportStatus @default(PENDING)
+  configuration String?    // JSON configuration
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isActive      Boolean   @default(true)
+}
+
+model Alert {
+  id            Int       @id @default(autoincrement())
+  title         String
+  description   String
+  severity      AlertSeverity
+  isResolved    Boolean   @default(false)
+  domainId      Int
+  domain        Domain    @relation(fields: [domainId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
